@@ -16,5 +16,6 @@ pub mod collision;
 pub mod combat;
 pub mod config;
 pub mod math;
+pub mod projectiles;
 pub mod targeting;
 pub mod types;
