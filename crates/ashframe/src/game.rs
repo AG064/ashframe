@@ -222,6 +222,9 @@ pub struct AshframeGame {
     debug_cam: bool,
     /// Whether to drive a canned demonstration instead of reading the keyboard.
     autoplay: bool,
+    /// Whether the demonstration should also win the mission, so the results
+    /// screen can be captured.
+    demo_win: bool,
 
     frames: u64,
     shot_path: Option<String>,
@@ -265,6 +268,7 @@ impl INode3D for AshframeGame {
             trace: false,
             debug_cam: false,
             autoplay: false,
+            demo_win: false,
             frames: 0,
             shot_path: None,
             shot_frame: 0,
@@ -781,6 +785,7 @@ impl AshframeGame {
             };
             self.sim.step(dt, &control, &mut sink);
         }
+        self.demo_win_tick();
         self.react_to_events();
 
         if let Some(audio) = self.audio.as_mut() {
@@ -867,6 +872,39 @@ impl AshframeGame {
         c.assault_held = (12.0..14.0).contains(&t);
         c.jump_pressed = (t - 9.6).abs() < 0.01;
         c.jump_held = (9.6..11.4).contains(&t);
+    }
+
+    /// Let the demonstration finish the mission.
+    ///
+    /// The script above is a bad player: it flies the yard firing at whatever
+    /// it happens to be pointing at, and by twenty seconds it is losing. That
+    /// is fine for a combat capture and useless for checking the results
+    /// screen, which is the one screen nobody sees until the end.
+    ///
+    /// So after twenty seconds the demonstration starts hitting, one unit per
+    /// step, so the fight ends the way a fight ends rather than in a single
+    /// frame of everything dying at once. The damage goes through the
+    /// simulation, which is what registers the kill: a harness that killed
+    /// units by writing to them directly would reach the results screen with
+    /// nothing on it, and would be evidence of nothing.
+    fn demo_win_tick(&mut self) {
+        if !self.demo_win || self.sim.time <= 20.0 {
+            return;
+        }
+        let Some(index) = self.sim.roster.list.iter().position(|enemy| enemy.alive) else {
+            return;
+        };
+        let lethal = self.sim.roster.list[index].health + 1.0;
+        let listener = self.sim.player.pos;
+        let effects = self.effects.as_mut().expect("effects are built in ready");
+        let audio = self.audio.as_mut().expect("audio is built in ready");
+        let mut sink = Sink {
+            effects,
+            audio,
+            listener,
+            log: &mut self.events,
+        };
+        self.sim.damage_enemy(index, lethal, &mut sink);
     }
 
     /// A fixed three-quarter view of the player, for looking at the rig itself
@@ -1175,6 +1213,11 @@ impl AshframeGame {
                 }
                 "--autoplay" => {
                     self.autoplay = true;
+                    i += 1;
+                }
+                "--demo-win" => {
+                    self.autoplay = true;
+                    self.demo_win = true;
                     i += 1;
                 }
                 "--trace" => {

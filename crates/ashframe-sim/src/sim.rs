@@ -620,6 +620,36 @@ impl Simulation {
         self.recovering = false;
     }
 
+    /// Apply damage to one enemy from outside a step.
+    ///
+    /// The sink is rebuilt here for the same reason it is rebuilt in `step`:
+    /// this is the only place that both knows which mech is the player and holds
+    /// the mission. Damage applied any other way would land on the mech and
+    /// never reach the statistics, so a scripted event — a demolition charge, a
+    /// cutscene, the capture harness finishing a mission — would kill something
+    /// and leave the results screen reporting that nothing died.
+    pub fn damage_enemy(&mut self, index: usize, amount: f32, app: &mut dyn Hooks) {
+        let Some(enemy) = self.roster.list.get_mut(index) else {
+            return;
+        };
+        if !enemy.alive {
+            return;
+        }
+        let player_id = self.player.id;
+        let mut snapshot = enemy.as_damageable();
+        {
+            let mut sink = Sink {
+                mission: &mut self.mission,
+                app,
+                pending: &mut self.pending,
+                player_id,
+                lock: None,
+            };
+            apply_damage(&mut snapshot, amount, 0.0, &mut sink, 1.0);
+        }
+        absorb(&snapshot, enemy.combat_fields());
+    }
+
     /// The live boss, if there is one.
     pub fn boss(&self) -> Option<&crate::enemies::Enemy> {
         self.roster
