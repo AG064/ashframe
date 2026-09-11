@@ -1,0 +1,12 @@
+# Read by `aurum doctor`, `build`, `dev`, and `studio`.
+schema_version = 1
+name = "ashframe"
+godot_version = "4.7"
+rust_package = "ashframe"
+addon_destination = "godot/addons/aurum"
+modules = []
+
+[engine]
+# Where the Aurum engine checkout lives. Everything the project
+# needs from the engine is reached through this path.
+path_hint = "A:/RecoveredProjects/C_Drive/Game_Development/aurum-engine"

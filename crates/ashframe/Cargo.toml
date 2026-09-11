@@ -1,0 +1,12 @@
+[package]
+name = "ashframe"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The engine checkout named in aurum.toml supplies Godot's
+# Rust bindings, so a project does not carry its own copy.
+godot = { git = "https://github.com/godot-rust/gdext", branch = "master", features = ["api-4-7"] }

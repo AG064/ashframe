@@ -1,0 +1,20 @@
+# Line endings, stated once.
+#
+# The engine repository learned this the hard way: a file that drifts to CRLF
+# shows up as a whole-file diff the first time somebody on another machine
+# touches it, and the rule it breaks was written down and then ignored in one
+# place. Source is LF everywhere, so a checkout behaves the same whatever
+# wrote it.
+* text=auto eol=lf
+
+# Binaries are not text and must never be converted. Godot's import cache and
+# any compiled extension are the ones that matter here.
+*.png binary
+*.jpg binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.pck binary
+*.ttf binary
+*.ogg binary
+*.wav binary

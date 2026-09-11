@@ -1,0 +1,10 @@
+[package]
+name = "ashframe-sim"
+version = "0.1.0"
+edition = "2021"
+description = "The Ashframe simulation, with no renderer and no engine. Ported from the TypeScript original."
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
