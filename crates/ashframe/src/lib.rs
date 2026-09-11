@@ -9,11 +9,13 @@
 //! library where the `.gdextension` file expects it.
 
 mod arena_view;
+mod audio;
 mod effects;
 mod game;
 mod input;
 mod palette;
 mod rig;
+mod synth;
 
 use godot::init::{gdextension, ExtensionLibrary, InitLevel};
 

@@ -25,6 +25,7 @@ use ashframe_sim::sim::{ControlState, Simulation};
 use ashframe_sim::types::{BladePhase, Hooks, MissionPhase, SimEvent};
 
 use crate::arena_view::ArenaView;
+use crate::audio::{Audio, Sound};
 use crate::effects::Effects;
 use crate::input::{self, keys, LookState, Wheel};
 use crate::palette::to_godot;
@@ -55,6 +56,9 @@ impl Phase {
 /// The event sink: turns simulation events into things on screen.
 struct Sink<'a> {
     effects: &'a mut Effects,
+    audio: &'a mut Audio,
+    /// Where the player is, for the audio range cull.
+    listener: ashframe_sim::types::Vec3,
     /// Events the frame's own reactions read, cleared each step.
     log: &'a mut Vec<SimEvent>,
 }
@@ -67,17 +71,98 @@ impl Hooks for Sink<'_> {
             } => {
                 self.effects.tracer(*origin, *direction);
                 self.effects.muzzle_flash(*origin, 1.0);
+                self.audio
+                    .play_at(Sound::FireRifle, *origin, self.listener, 1.0);
             }
-            SimEvent::EnemyFire { at } => self.effects.muzzle_flash(*at, 0.7),
-            SimEvent::MissileLaunch { origin, .. } => self.effects.muzzle_flash(*origin, 1.4),
-            SimEvent::Impact { at, .. } => self.effects.impact(*at),
-            SimEvent::Explosion { at, radius } => self.effects.explosion(*at, *radius),
+            SimEvent::EnemyFire { at } => {
+                self.effects.muzzle_flash(*at, 0.7);
+                self.audio.play_at(Sound::EnemyFire, *at, self.listener, 1.0);
+            }
+            SimEvent::MissileLaunch { origin, .. } => {
+                self.effects.muzzle_flash(*origin, 1.4);
+                self.audio
+                    .play_at(Sound::MissileLaunch, *origin, self.listener, 1.0);
+            }
+
+            SimEvent::BladeHit { at, .. } => {
+                self.audio
+                    .play_at(Sound::BladeHit, *at, self.listener, 1.0);
+            }
+            // A hard surface rings and a soft one thuds, and the simulation
+            // already tags every prop with what it is made of.
+            SimEvent::Impact { at, surface, .. } => {
+                self.effects.impact(*at);
+                let hard = matches!(
+                    surface.as_str(),
+                    "steel" | "plating" | "armor" | "player" | "tank" | "container" | "glass"
+                );
+                self.audio.play_at(
+                    if hard {
+                        Sound::ImpactHard
+                    } else {
+                        Sound::ImpactSoft
+                    },
+                    *at,
+                    self.listener,
+                    1.0,
+                );
+            }
+            SimEvent::Explosion { at, radius } => {
+                self.effects.explosion(*at, *radius);
+                self.audio
+                    .play_at(Sound::Explosion, *at, self.listener, 1.0);
+            }
             SimEvent::Telegraph {
                 at,
                 radius,
                 duration,
-            } => self.effects.telegraph(*at, *radius, *duration),
+            } => {
+                self.effects.telegraph(*at, *radius, *duration);
+                self.audio
+                    .play_at(Sound::Telegraph, *at, self.listener, 1.0);
+            }
             SimEvent::Hit { at, .. } => self.effects.impact(*at),
+            // The blade is heard when it is swung rather than when it connects;
+            // the windup is the phase the player is committing to.
+            SimEvent::Blade {
+                phase: BladePhase::Windup,
+            } => self
+                .audio
+                .play_at(Sound::BladeSwing, self.listener, self.listener, 1.0),
+            SimEvent::Jump { .. } => self.audio.play_at(
+                Sound::Boost,
+                self.listener,
+                self.listener,
+                0.8,
+            ),
+            SimEvent::QuickBoost { .. } => {
+                self.audio
+                    .play_at(Sound::Boost, self.listener, self.listener, 1.0)
+            }
+            SimEvent::AssaultStart => {
+                self.audio
+                    .play_at(Sound::Boost, self.listener, self.listener, 0.7)
+            }
+            SimEvent::Land { speed, .. } => {
+                let gain = (speed / 40.0).clamp(0.2, 1.0);
+                self.audio
+                    .play_at(Sound::Landing, self.listener, self.listener, gain);
+            }
+            SimEvent::LockAcquired { .. } => self.audio.play_ui(Sound::LockAcquired),
+            SimEvent::LockLost { .. } => self.audio.play_ui(Sound::LockLost),
+            SimEvent::RepairStart { .. } => self.audio.play_ui(Sound::Repair),
+            SimEvent::EnergyEmpty => self.audio.energy_warning(),
+            SimEvent::PlayerStagger => {
+                self.audio
+                    .play_at(Sound::PlayerStagger, self.listener, self.listener, 1.0)
+            }
+            SimEvent::PlayerDamage { at, .. } => self.audio.damage(*at, self.listener),
+            SimEvent::Destroy { at, .. } => {
+                self.audio
+                    .play_at(Sound::Explosion, *at, self.listener, 1.0)
+            }
+            SimEvent::MissionComplete { .. } => self.audio.play_ui(Sound::MissionComplete),
+            SimEvent::MissionFailed => self.audio.play_ui(Sound::MissionFailed),
             _ => {}
         }
         // Bounded, so a long fight cannot grow this through the HUD channel.
@@ -99,6 +184,7 @@ pub struct AshframeGame {
 
     arena: Option<ArenaView>,
     effects: Option<Effects>,
+    audio: Option<Audio>,
     /// Index zero is the player; the rest are hostiles, paired with roster
     /// entries by position.
     rigs: Vec<MechRig>,
@@ -155,6 +241,7 @@ impl INode3D for AshframeGame {
             phase: Phase::Ready,
             arena: None,
             effects: None,
+            audio: None,
             rigs: Vec::new(),
             enemy_rigs: Vec::new(),
             camera_node: None,
@@ -274,6 +361,9 @@ impl INode3D for AshframeGame {
             if self.phase == Phase::Ready {
                 self.place_camera_idle(dt);
             }
+            if let Some(audio) = self.audio.as_mut() {
+                audio.hush();
+            }
         }
         self.present(dt);
     }
@@ -282,6 +372,9 @@ impl INode3D for AshframeGame {
         let dt = delta as f32;
         if let Some(effects) = self.effects.as_mut() {
             effects.step(dt);
+        }
+        if let Some(audio) = self.audio.as_mut() {
+            audio.step(dt);
         }
         if self.hint_left > 0.0 {
             self.hint_left -= dt;
@@ -333,6 +426,9 @@ impl AshframeGame {
         self.hint = GString::from("");
         self.hint_left = 0.0;
         self.capture_mouse(true);
+        if let Some(audio) = self.audio.as_mut() {
+            audio.play_ui(Sound::UiConfirm);
+        }
     }
 
     /// Back to the briefing.
@@ -356,10 +452,16 @@ impl AshframeGame {
             Phase::Playing => {
                 self.phase = Phase::Paused;
                 self.capture_mouse(false);
+                if let Some(audio) = self.audio.as_mut() {
+                    audio.play_ui(Sound::UiClick);
+                }
             }
             Phase::Paused => {
                 self.phase = Phase::Playing;
                 self.capture_mouse(true);
+                if let Some(audio) = self.audio.as_mut() {
+                    audio.play_ui(Sound::UiClick);
+                }
             }
             _ => {}
         }
@@ -664,14 +766,26 @@ impl AshframeGame {
 
         self.events.clear();
         {
+            let listener = self.sim.player.pos;
             let effects = self.effects.as_mut().expect("effects are built in ready");
+            let audio = self.audio.as_mut().expect("audio is built in ready");
             let mut sink = Sink {
                 effects,
+                audio,
+                listener,
                 log: &mut self.events,
             };
             self.sim.step(dt, &control, &mut sink);
         }
         self.react_to_events();
+
+        if let Some(audio) = self.audio.as_mut() {
+            audio.drive(
+                self.sim.player.speed(),
+                thrust_level(&self.sim.player),
+                self.sim.player.assaulting,
+            );
+        }
 
         // The walk cycle advances with distance travelled rather than with
         // time, so a mech standing still does not march on the spot and a fast
@@ -1018,6 +1132,7 @@ impl AshframeGame {
         let arena = ArenaView::build(&mut this, &self.sim.arena);
         self.arena = Some(arena);
         self.effects = Some(Effects::build(&mut this));
+        self.audio = Some(Audio::build(&mut this));
         self.rebuild_rigs();
     }
 

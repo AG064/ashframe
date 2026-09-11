@@ -475,7 +475,10 @@ func _update_vignette(delta: float) -> void:
 		_shake_flash = 1.0
 	_last_health = health
 	_shake_flash = maxf(0.0, _shake_flash - delta * 2.4)
-	_vignette.color = Color(0.7, 0.06, 0.04, _shake_flash * 0.4)
+	# Deliberately faint. At four tenths of full opacity this is a red screen
+	# rather than a warning, and a player under sustained fire spends the whole
+	# fight looking through it.
+	_vignette.color = Color(0.7, 0.06, 0.04, _shake_flash * _shake_flash * 0.22)
 
 
 func _clock(seconds: float) -> String:
