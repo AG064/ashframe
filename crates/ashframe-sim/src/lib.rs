@@ -15,6 +15,7 @@ pub mod arena;
 pub mod collision;
 pub mod combat;
 pub mod config;
+pub mod enemies;
 pub mod math;
 pub mod player;
 pub mod projectiles;
