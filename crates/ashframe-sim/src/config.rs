@@ -292,6 +292,21 @@ pub mod mission {
     /// Time between a wave clearing and the next deployment.
     pub const WAVE_GAP: f32 = 2.5;
     pub const INTRO_TIME: f32 = 3.2;
+
+    /// Points for a kill, by archetype.
+    ///
+    /// Matched by archetype rather than looked up by name, which is what the
+    /// original did: a string table would score an archetype that was renamed
+    /// as zero, and a silent zero on the results screen reads as a bug rather
+    /// than as a missing entry.
+    pub fn score_for(kind: crate::types::EnemyKind) -> u32 {
+        use crate::types::EnemyKind;
+        match kind {
+            EnemyKind::Skirmisher => 100,
+            EnemyKind::Artillery => 175,
+            EnemyKind::Boss => 2500,
+        }
+    }
 }
 
 /// Presentation limits.

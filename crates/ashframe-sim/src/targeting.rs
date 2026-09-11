@@ -23,7 +23,7 @@ use crate::config::targeting as cfg;
 use crate::types::{Damageable, Hooks, SimEvent, Vec3};
 
 /// Where the reticle is and which way it points.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct TargetingView {
     pub yaw: f32,
     pub pitch: f32,
@@ -340,7 +340,7 @@ mod tests {
         Damageable {
             id,
             faction: crate::types::Faction::Enemy,
-            name: format!("e{id}"),
+            name: "enemy",
             pos: at,
             vel: Vec3::ZERO,
             radius: 1.35,

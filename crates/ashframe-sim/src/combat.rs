@@ -37,6 +37,60 @@ pub struct DamageResult {
     pub dealt: f32,
 }
 
+/// The state combat is allowed to change, borrowed off the mech that owns it.
+///
+/// The original had one mech object that satisfied the damageable interface
+/// directly, so a hit changed the mech. Here a mech is a `Player` or an `Enemy`
+/// and [`Damageable`] is a snapshot of one, handed to the projectile system as a
+/// slice. Damage lands on the snapshots, and this is the return trip.
+///
+/// It deliberately does *not* carry position or velocity. By the time damage is
+/// folded back the mech has already moved this step, and it is the authority on
+/// where it is; letting a stale snapshot write its position back would make
+/// every unit that took a hit stutter backwards a frame.
+pub struct CombatFields<'a> {
+    pub health: &'a mut f32,
+    pub stability: &'a mut f32,
+    pub alive: &'a mut bool,
+    pub stagger_timer: &'a mut f32,
+    pub invuln_timer: &'a mut f32,
+    pub stagger_armed: &'a mut bool,
+}
+
+/// Fold combat results from a snapshot back into the mech it was taken from.
+///
+/// The destructuring is the point: adding a field to [`Damageable`] stops this
+/// compiling, so a new piece of combat state cannot be silently lost on the way
+/// back. The ignored bindings are the fields the mech, not combat, is the
+/// authority for.
+pub fn absorb(updated: &Damageable, into: CombatFields<'_>) {
+    let Damageable {
+        health,
+        stability,
+        alive,
+        stagger_timer,
+        invuln_timer,
+        stagger_armed,
+        // Identity, placement and the maxima belong to the mech.
+        id: _,
+        faction: _,
+        name: _,
+        pos: _,
+        vel: _,
+        radius: _,
+        height: _,
+        max_health: _,
+        max_stability: _,
+    } = updated;
+
+    *into.health = *health;
+    *into.stability = *stability;
+    *into.alive = *alive;
+    *into.stagger_timer = *stagger_timer;
+    *into.invuln_timer = *invuln_timer;
+    *into.stagger_armed = *stagger_armed;
+}
+
 /// How much to scale this hit by, before the caller's own multiplier.
 ///
 /// Split out because it is the whole of the vulnerability rule and is worth
@@ -113,7 +167,7 @@ pub fn apply_damage(
         hooks.emit(&SimEvent::Destroy {
             at: target.pos + crate::types::Vec3::new(0.0, target.height * 0.5, 0.0),
             target: target.id,
-            kind: target.name.clone(),
+            kind: target.name,
         });
         return DamageResult {
             destroyed: true,
@@ -138,7 +192,7 @@ mod tests {
         Damageable {
             id: 1,
             faction,
-            name: "target".into(),
+            name: "target",
             pos: Vec3::ZERO,
             vel: Vec3::ZERO,
             radius: 1.0,

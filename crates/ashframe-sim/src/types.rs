@@ -199,7 +199,13 @@ impl Faction {
 pub struct Damageable {
     pub id: u32,
     pub faction: Faction,
-    pub name: String,
+    /// A stable label, not a display name. It travels on the destroy
+    /// event and is what a results screen and a replay log key off, so it
+    /// is the archetype id rather than the name a player reads.
+    ///
+    /// Static because a snapshot is taken several times per step per unit;
+    /// a String here was an allocation on every one of them.
+    pub name: &'static str,
     /// Feet position.
     pub pos: Vec3,
     pub vel: Vec3,
@@ -270,6 +276,22 @@ impl EnemyKind {
             Self::Boss => "ASHFRAME PATRIARCH",
         }
     }
+
+    /// Decode the archetype a [`Self::label`] came from.
+    ///
+    /// The label travels on the destroy event, which is a description of what
+    /// happened rather than a live reference: it is what a replay log stores and
+    /// what a results screen prints. This is the other half of that, and the
+    /// half a replay loader would need. A test pins the round trip, because a
+    /// label that stopped decoding would silently stop scoring kills.
+    pub fn from_label(label: &str) -> Option<Self> {
+        match label {
+            "skirmisher" => Some(Self::Skirmisher),
+            "artillery" => Some(Self::Artillery),
+            "boss" => Some(Self::Boss),
+            _ => None,
+        }
+    }
 }
 
 /// Every weapon in the game, on both sides.
@@ -327,12 +349,18 @@ impl BladePhase {
 }
 
 /// Where a mission has got to.
+///
+/// Every variant is reachable. An `Idle` state was tried and removed: the
+/// mission is in its deploy countdown from the moment it is constructed, so an
+/// extra state before that would be one the game never visits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MissionPhase {
-    Idle,
     Intro,
     Wave1,
+    /// Between the two waves: the yard is clear and the next drop is inbound.
+    Gap1,
     Wave2,
+    Gap2,
     Boss,
     Victory,
     Defeat,
@@ -341,10 +369,11 @@ pub enum MissionPhase {
 impl MissionPhase {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Idle => "idle",
             Self::Intro => "intro",
             Self::Wave1 => "wave1",
+            Self::Gap1 => "gap1",
             Self::Wave2 => "wave2",
+            Self::Gap2 => "gap2",
             Self::Boss => "boss",
             Self::Victory => "victory",
             Self::Defeat => "defeat",
@@ -410,7 +439,7 @@ pub enum SimEvent {
     Destroy {
         at: Vec3,
         target: u32,
-        kind: String,
+        kind: &'static str,
     },
     Explosion {
         at: Vec3,
@@ -582,6 +611,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn an_archetype_label_round_trips() {
+        // The destroy event carries the label and the mission scores from it.
+        // A label that stopped decoding would not break anything loudly; kills
+        // would just stop counting.
+        for kind in [EnemyKind::Skirmisher, EnemyKind::Artillery, EnemyKind::Boss] {
+            assert_eq!(EnemyKind::from_label(kind.label()), Some(kind));
+        }
+        assert_eq!(EnemyKind::from_label("ASHFRAME"), None);
+        assert_eq!(EnemyKind::from_label(""), None);
+        assert_eq!(
+            EnemyKind::from_label(EnemyKind::Boss.display_name()),
+            None,
+            "the display name is not an archetype id"
+        );
+    }
+
+    #[test]
     fn a_vector_knows_its_length() {
         assert_eq!(Vec3::new(3.0, 4.0, 0.0).length(), 5.0);
         assert_eq!(Vec3::ZERO.length(), 0.0);
@@ -654,7 +700,7 @@ mod tests {
         let mut d = Damageable {
             id: 1,
             faction: Faction::Enemy,
-            name: "test".into(),
+            name: "test",
             pos: Vec3::ZERO,
             vel: Vec3::ZERO,
             radius: 1.0,
@@ -681,7 +727,7 @@ mod tests {
         let mut d = Damageable {
             id: 1,
             faction: Faction::Player,
-            name: "test".into(),
+            name: "test",
             pos: Vec3::ZERO,
             vel: Vec3::ZERO,
             radius: 1.0,

@@ -902,6 +902,11 @@ impl Player {
     fn fire_rifle(&mut self, hooks: &mut dyn Hooks) {
         self.fire_cooldown = 1.0 / rifle::RPM;
         self.ammo -= 1;
+        // The original applied this from the simulation's event sink, reaching
+        // back into the mech it was in the middle of stepping. Recoil is the
+        // gun's business and the gun is here, so it happens here and the sink
+        // does not need a second mutable borrow of the player to do it.
+        self.recoil_impulse(rifle::RECOIL);
 
         let muzzle = self.rifle_muzzle();
         let aim = (self.aim_point - muzzle).normalized();
@@ -1059,7 +1064,7 @@ impl Player {
         crate::types::Damageable {
             id: self.id,
             faction: Faction::Player,
-            name: "ASHFRAME".to_string(),
+            name: "ASHFRAME",
             pos: self.pos,
             vel: self.vel,
             radius: self.radius,
@@ -1072,6 +1077,18 @@ impl Player {
             stagger_timer: self.stagger_timer,
             invuln_timer: self.invuln_timer,
             stagger_armed: self.stagger_armed,
+        }
+    }
+
+    /// The slice of this mech that combat owns, for folding hits back in.
+    pub fn combat_fields(&mut self) -> crate::combat::CombatFields<'_> {
+        crate::combat::CombatFields {
+            health: &mut self.health,
+            stability: &mut self.stability,
+            alive: &mut self.alive,
+            stagger_timer: &mut self.stagger_timer,
+            invuln_timer: &mut self.invuln_timer,
+            stagger_armed: &mut self.stagger_armed,
         }
     }
 

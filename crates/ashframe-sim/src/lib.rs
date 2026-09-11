@@ -12,12 +12,15 @@
 //! replaced — Three.js for Godot — without rewriting the game.
 
 pub mod arena;
+pub mod camera;
 pub mod collision;
 pub mod combat;
 pub mod config;
 pub mod enemies;
 pub mod math;
+pub mod mission;
 pub mod player;
 pub mod projectiles;
+pub mod sim;
 pub mod targeting;
 pub mod types;

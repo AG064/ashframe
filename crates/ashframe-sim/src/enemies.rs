@@ -34,6 +34,7 @@
 //! roster owns those and steps them one at a time.
 
 use crate::collision::CollisionWorld;
+use crate::combat::CombatFields;
 use crate::config::{
     artillery as artillery_cfg, boss as boss_cfg, skirmisher as skirmisher_cfg, world as world_cfg,
 };
@@ -248,7 +249,7 @@ impl Enemy {
         Damageable {
             id: self.id,
             faction: Faction::Enemy,
-            name: self.name.to_string(),
+            name: self.kind.label(),
             pos: self.pos,
             vel: self.vel,
             radius: self.radius,
@@ -261,6 +262,18 @@ impl Enemy {
             stagger_timer: self.stagger_timer,
             invuln_timer: self.invuln_timer,
             stagger_armed: self.stagger_armed,
+        }
+    }
+
+    /// The slice of this unit that combat owns, for folding hits back in.
+    pub fn combat_fields(&mut self) -> CombatFields<'_> {
+        CombatFields {
+            health: &mut self.health,
+            stability: &mut self.stability,
+            alive: &mut self.alive,
+            stagger_timer: &mut self.stagger_timer,
+            invuln_timer: &mut self.invuln_timer,
+            stagger_armed: &mut self.stagger_armed,
         }
     }
 

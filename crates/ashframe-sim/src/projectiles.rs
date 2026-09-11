@@ -119,7 +119,12 @@ pub struct BulletSpec {
 pub struct MissileSpec {
     pub faction: Faction,
     pub owner: u32,
-    pub target: u32,
+    /// Locked target, or `None` for a dumb-fire shot that flies straight.
+    ///
+    /// The original carried the absence of a lock as the id `-1` and checked
+    /// `>= 0` at every use. Naming it here means a launcher with nothing locked
+    /// cannot accidentally home on whatever happens to hold id zero.
+    pub target: Option<u32>,
     pub at: Vec3,
     pub direction: Vec3,
     pub speed: f32,
@@ -270,7 +275,7 @@ impl ProjectileSystem {
         p.impact = 14.0;
         p.splash_radius = spec.splash_radius;
         p.splash_damage = spec.splash_damage;
-        p.target_id = Some(spec.target);
+        p.target_id = spec.target;
         p.turn_rate = spec.turn_rate;
         p.gravity = 0.0;
         p.life = spec.life;
@@ -652,7 +657,7 @@ mod tests {
         Damageable {
             id,
             faction,
-            name: format!("t{id}"),
+            name: "target",
             pos: at,
             vel: Vec3::ZERO,
             radius: 1.5,
@@ -815,7 +820,7 @@ mod tests {
         MissileSpec {
             faction: Faction::Player,
             owner: 100,
-            target: target_id,
+            target: Some(target_id),
             at,
             direction,
             speed: 52.0,
@@ -990,6 +995,30 @@ mod tests {
             system.step(sim::DT, &world, &mut [], &mut log);
         }
         assert!(log.any("explosion"), "a dying warhead should still go off");
+    }
+
+    #[test]
+    fn a_dumb_fired_missile_flies_straight_past_everything() {
+        // Without a lock the round must not pick a target up off the floor of
+        // the id space: the player is usually id zero, and a missile that
+        // silently homes on its own launcher is the kind of bug that only shows
+        // up in a play test.
+        let world = empty_world();
+        let mut system = ProjectileSystem::new();
+        let mut log = EventLog::new();
+        let mut bystander = [target(0, Faction::Player, Vec3::new(0.0, 0.0, 40.0))];
+
+        let mut spec = missile(Vec3::new(0.0, 2.0, 0.0), Vec3::new(0.0, 0.0, 1.0), 0);
+        spec.target = None;
+        system.spawn_missile(spec);
+
+        for _ in 0..30 {
+            system.step(sim::DT, &world, &mut bystander, &mut log);
+            assert_eq!(
+                bystander[0].health, 1000.0,
+                "an unguided round turned onto a bystander"
+            );
+        }
     }
 
     // -- area effects -----------------------------------------------------
