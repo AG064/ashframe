@@ -11,5 +11,6 @@
 //! assertions can run here as ran there, and the reason the renderer could be
 //! replaced — Three.js for Godot — without rewriting the game.
 
+pub mod config;
 pub mod math;
 pub mod types;
