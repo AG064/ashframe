@@ -13,6 +13,7 @@
 
 pub mod arena;
 pub mod collision;
+pub mod combat;
 pub mod config;
 pub mod math;
 pub mod types;
