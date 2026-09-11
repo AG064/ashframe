@@ -467,7 +467,7 @@ impl CollisionWorld {
                 let nz = dz / d;
                 pos.x += nx * push;
                 pos.z += nz * push;
-                out.normal_xz = out.normal_xz + Vec3::new(nx, 0.0, nz);
+                out.normal_xz += Vec3::new(nx, 0.0, nz);
             } else {
                 // The centre is inside the footprint. Escape along the
                 // shallowest face, which is the shortest way out and the one
@@ -479,16 +479,16 @@ impl CollisionWorld {
                 let m = to_min_x.min(to_max_x).min(to_min_z).min(to_max_z);
                 if m == to_min_x {
                     pos.x = b.min_x - radius;
-                    out.normal_xz = out.normal_xz + Vec3::new(-1.0, 0.0, 0.0);
+                    out.normal_xz += Vec3::new(-1.0, 0.0, 0.0);
                 } else if m == to_max_x {
                     pos.x = b.max_x + radius;
-                    out.normal_xz = out.normal_xz + Vec3::new(1.0, 0.0, 0.0);
+                    out.normal_xz += Vec3::new(1.0, 0.0, 0.0);
                 } else if m == to_min_z {
                     pos.z = b.min_z - radius;
-                    out.normal_xz = out.normal_xz + Vec3::new(0.0, 0.0, -1.0);
+                    out.normal_xz += Vec3::new(0.0, 0.0, -1.0);
                 } else {
                     pos.z = b.max_z + radius;
-                    out.normal_xz = out.normal_xz + Vec3::new(0.0, 0.0, 1.0);
+                    out.normal_xz += Vec3::new(0.0, 0.0, 1.0);
                 }
             }
         }

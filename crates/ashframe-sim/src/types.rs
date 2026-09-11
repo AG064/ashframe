@@ -139,6 +139,33 @@ impl std::ops::Neg for Vec3 {
     }
 }
 
+/// The compound forms, so accumulating a surface normal or stepping a position
+/// reads as `+=` rather than as a reassignment. Same arithmetic, fewer chances
+/// to write `=` where `+=` was meant.
+impl std::ops::AddAssign for Vec3 {
+    fn add_assign(&mut self, other: Self) {
+        self.x += other.x;
+        self.y += other.y;
+        self.z += other.z;
+    }
+}
+
+impl std::ops::SubAssign for Vec3 {
+    fn sub_assign(&mut self, other: Self) {
+        self.x -= other.x;
+        self.y -= other.y;
+        self.z -= other.z;
+    }
+}
+
+impl std::ops::MulAssign<f32> for Vec3 {
+    fn mul_assign(&mut self, factor: f32) {
+        self.x *= factor;
+        self.y *= factor;
+        self.z *= factor;
+    }
+}
+
 /// Which side something is on. Player and enemy never collide with their own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Faction {
