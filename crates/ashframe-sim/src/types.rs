@@ -301,12 +301,29 @@ impl WeaponId {
     }
 }
 
-/// The three beats of a blade swing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// The beats of a blade swing.
+///
+/// `Idle` is not a beat but the absence of one, and it belongs here because the
+/// player's state machine holds this value between swings and compares against
+/// it to decide whether a press starts a new one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum BladePhase {
+    #[default]
+    Idle,
     Windup,
     Active,
     Recovery,
+}
+
+impl BladePhase {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Windup => "windup",
+            Self::Active => "active",
+            Self::Recovery => "recovery",
+        }
+    }
 }
 
 /// Where a mission has got to.
