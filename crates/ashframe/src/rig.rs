@@ -453,8 +453,11 @@ impl MechRig {
         // Hit flash: the shell runs hot for a fraction of a second. Applied to
         // the shared materials, which every part of this rig uses.
         let flash = pose.hit_flash.clamp(0.0, 1.0);
-        self.shell
-            .set_albedo(self.spec.shell_color.lerp(Color::WHITE, (flash * 0.8) as f64));
+        self.shell.set_albedo(
+            self.spec
+                .shell_color
+                .lerp(Color::WHITE, (flash * 0.8) as f64),
+        );
         self.shell
             .set("emission_enabled", &(flash > 0.01).to_variant());
         if flash > 0.01 {
@@ -487,11 +490,7 @@ fn build_leg(
     // Wide at the hip, narrow at the ankle: the shape follows the load.
     let thigh_length = spec.hip_height * 0.50;
     let mut thigh = box_node(
-        Vector3::new(
-            spec.leg_width * 1.15,
-            thigh_length,
-            spec.leg_width * 1.25,
-        ),
+        Vector3::new(spec.leg_width * 1.15, thigh_length, spec.leg_width * 1.25),
         shell,
     );
     thigh.set_position(Vector3::new(0.0, -thigh_length * 0.5, 0.0));
@@ -514,11 +513,7 @@ fn build_leg(
 
     let shin_length = spec.hip_height * 0.42;
     let mut shin = box_node(
-        Vector3::new(
-            spec.leg_width * 0.9,
-            shin_length,
-            spec.leg_width * 1.05,
-        ),
+        Vector3::new(spec.leg_width * 0.9, shin_length, spec.leg_width * 1.05),
         shell,
     );
     shin.set_position(Vector3::new(0.0, -shin_length * 0.5, 0.0));
@@ -624,11 +619,7 @@ fn build_gun(
 
     let barrel_length = spec.height * 0.40;
     let mut barrel = box_node(
-        Vector3::new(
-            spec.leg_width * 0.5,
-            spec.leg_width * 0.5,
-            barrel_length,
-        ),
+        Vector3::new(spec.leg_width * 0.5, spec.leg_width * 0.5, barrel_length),
         dark,
     );
     barrel.set_position(Vector3::new(

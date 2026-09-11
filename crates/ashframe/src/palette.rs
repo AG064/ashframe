@@ -10,7 +10,6 @@ use godot::classes::mesh::PrimitiveType;
 use godot::classes::{ArrayMesh, BoxMesh, MeshInstance3D, StandardMaterial3D};
 use godot::prelude::*;
 
-
 /// The arena palette, as `0xRRGGBB`, matching the simulation's table.
 ///
 /// Duplicated here rather than read from the simulation because the simulation
@@ -130,7 +129,7 @@ impl MechSpec {
     }
 
     pub fn for_frame(frame: crate::rig::Frame) -> Self {
-        use ashframe_sim::config::{boss, player, skirmisher, artillery};
+        use ashframe_sim::config::{artillery, boss, player, skirmisher};
         use ashframe_sim::types::EnemyKind;
         match frame {
             crate::rig::Frame::Player => Self::derive(
@@ -210,9 +209,8 @@ pub fn grid_texture(base: u32, cell_px: i32, size_px: i32) -> Gd<godot::classes:
         1.0,
     );
 
-    let mut image =
-        Image::create(size_px, size_px, false, godot::classes::image::Format::RGB8)
-            .expect("256 square is a valid image size");
+    let mut image = Image::create(size_px, size_px, false, godot::classes::image::Format::RGB8)
+        .expect("256 square is a valid image size");
 
     for y in 0..size_px {
         for x in 0..size_px {
@@ -224,10 +222,8 @@ pub fn grid_texture(base: u32, cell_px: i32, size_px: i32) -> Gd<godot::classes:
             // it is allowed to overflow. Left unchecked it panics in a debug
             // build, which is a texture that crashes the game on load.
             let (ux, uy) = (x as u32, y as u32);
-            let n = ux
-                .wrapping_mul(73_856_093)
-                ^ uy.wrapping_mul(19_349_663)
-                .wrapping_mul(0x2545_f491);
+            let n =
+                ux.wrapping_mul(73_856_093) ^ uy.wrapping_mul(19_349_663).wrapping_mul(0x2545_f491);
             let noise = ((n >> 16) & 0xff) as f32 / 255.0;
             let shade = 0.94 + noise * 0.12;
             let pixel = if on_seam {
@@ -303,7 +299,8 @@ pub fn grid_material(base: u32, metallic: f32, roughness: f32) -> Gd<StandardMat
 }
 
 /// A material that glows, for anything that should read as powered.
-pub fn glow(color: Color, energy: f32) -> Gd<StandardMaterial3D> {    let mut mat = StandardMaterial3D::new_gd();
+pub fn glow(color: Color, energy: f32) -> Gd<StandardMaterial3D> {
+    let mut mat = StandardMaterial3D::new_gd();
     mat.set_albedo(color);
     mat.set_metallic(0.0);
     mat.set_roughness(0.35);
@@ -338,7 +335,10 @@ pub fn box_node(size: Vector3, mat: &Gd<StandardMaterial3D>) -> Gd<MeshInstance3
 /// apron around the arena.
 pub fn ground_plane(size: f32, mat: &Gd<StandardMaterial3D>) -> Gd<MeshInstance3D> {
     let mut arrays: Array<Variant> = Array::new();
-    arrays.resize(godot::classes::mesh::ArrayType::MAX.ord() as usize, &Variant::nil());
+    arrays.resize(
+        godot::classes::mesh::ArrayType::MAX.ord() as usize,
+        &Variant::nil(),
+    );
 
     let half = size * 0.5;
     let normal = Vector3::UP;
@@ -363,10 +363,22 @@ pub fn ground_plane(size: f32, mat: &Gd<StandardMaterial3D>) -> Gd<MeshInstance3
     // sky's ground gradient.
     let indices = PackedInt32Array::from(&[0, 1, 2, 0, 2, 3]);
 
-    arrays.set(godot::classes::mesh::ArrayType::VERTEX.ord() as usize, &points.to_variant());
-    arrays.set(godot::classes::mesh::ArrayType::NORMAL.ord() as usize, &normals.to_variant());
-    arrays.set(godot::classes::mesh::ArrayType::TEX_UV.ord() as usize, &uvs.to_variant());
-    arrays.set(godot::classes::mesh::ArrayType::INDEX.ord() as usize, &indices.to_variant());
+    arrays.set(
+        godot::classes::mesh::ArrayType::VERTEX.ord() as usize,
+        &points.to_variant(),
+    );
+    arrays.set(
+        godot::classes::mesh::ArrayType::NORMAL.ord() as usize,
+        &normals.to_variant(),
+    );
+    arrays.set(
+        godot::classes::mesh::ArrayType::TEX_UV.ord() as usize,
+        &uvs.to_variant(),
+    );
+    arrays.set(
+        godot::classes::mesh::ArrayType::INDEX.ord() as usize,
+        &indices.to_variant(),
+    );
 
     let mut mesh = ArrayMesh::new_gd();
     mesh.add_surface_from_arrays(PrimitiveType::TRIANGLES, &arrays);
@@ -378,9 +390,7 @@ pub fn ground_plane(size: f32, mat: &Gd<StandardMaterial3D>) -> Gd<MeshInstance3
     // most of the shadow map, and at that texel size the surface shadows itself
     // into large soft blotches; nothing is underneath it to receive a shadow
     // anyway. It still *receives*, which is what puts the mechs' shadows on it.
-    node.set_cast_shadows_setting(
-        godot::classes::geometry_instance_3d::ShadowCastingSetting::OFF,
-    );
+    node.set_cast_shadows_setting(godot::classes::geometry_instance_3d::ShadowCastingSetting::OFF);
     node
 }
 

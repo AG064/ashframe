@@ -1,0 +1,66 @@
+# The gates. A change that breaks one of these is a change that is not finished.
+#
+# Only the simulation and the renderer's pure parts run here: the Godot layer
+# needs an engine and a graphics device, and neither belongs in CI. The split
+# that makes that possible is the same split that let the renderer be replaced.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+  # The simulation is engine-free by construction, and this is what holds that
+  # true. If a dependency ever appears in its manifest, the crate has stopped
+  # being testable without a graphics device and the split has quietly ended.
+  no-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The simulation has no dependencies
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re, sys, pathlib
+          manifest = pathlib.Path("crates/ashframe-sim/Cargo.toml").read_text()
+          body = manifest.split("[dependencies]", 1)
+          if len(body) == 1:
+              print("ashframe-sim has no [dependencies] section at all")
+              sys.exit(1)
+          rest = body[1].split("[", 1)[0]
+          declared = [l for l in rest.splitlines() if l.strip() and not l.strip().startswith("#")]
+          if declared:
+              print("ashframe-sim gained a dependency:")
+              print("\n".join(declared))
+              sys.exit(1)
+          print("ashframe-sim is still dependency-free")
+          PY

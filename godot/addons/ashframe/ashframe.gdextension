@@ -1,0 +1,24 @@
+; The Ashframe extension.
+;
+; The library is installed by `aurum build` into the engine add-on's bin
+; directory, because that is where the engine puts a project's crate. The
+; manifest lives here instead, so that refreshing the engine add-on cannot
+; overwrite the project's own extension.
+;
+; `entry_symbol` is named rather than left at gdext's default of
+; `gdext_rust_init`, because this project loads two Rust libraries: the
+; engine's and this one. A shared symbol is resolved by name, and a collision
+; does not fail loudly — the scene's AshframeGame node quietly becomes a plain
+; Node and every script that talks to it fails on the first frame.
+[configuration]
+entry_symbol = "ashframe_init"
+compatibility_minimum = "4.7"
+reloadable = true
+
+[libraries]
+windows.debug.x86_64 = "res://addons/aurum/bin/ashframe.debug.dll"
+windows.release.x86_64 = "res://addons/aurum/bin/ashframe.dll"
+linux.debug.x86_64 = "res://addons/aurum/bin/libashframe.so"
+linux.release.x86_64 = "res://addons/aurum/bin/libashframe.so"
+macos.debug = "res://addons/aurum/bin/libashframe.dylib"
+macos.release = "res://addons/aurum/bin/libashframe.dylib"

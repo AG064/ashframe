@@ -76,7 +76,8 @@ impl Hooks for Sink<'_> {
             }
             SimEvent::EnemyFire { at } => {
                 self.effects.muzzle_flash(*at, 0.7);
-                self.audio.play_at(Sound::EnemyFire, *at, self.listener, 1.0);
+                self.audio
+                    .play_at(Sound::EnemyFire, *at, self.listener, 1.0);
             }
             SimEvent::MissileLaunch { origin, .. } => {
                 self.effects.muzzle_flash(*origin, 1.4);
@@ -85,8 +86,7 @@ impl Hooks for Sink<'_> {
             }
 
             SimEvent::BladeHit { at, .. } => {
-                self.audio
-                    .play_at(Sound::BladeHit, *at, self.listener, 1.0);
+                self.audio.play_at(Sound::BladeHit, *at, self.listener, 1.0);
             }
             // A hard surface rings and a soft one thuds, and the simulation
             // already tags every prop with what it is made of.
@@ -129,12 +129,10 @@ impl Hooks for Sink<'_> {
             } => self
                 .audio
                 .play_at(Sound::BladeSwing, self.listener, self.listener, 1.0),
-            SimEvent::Jump { .. } => self.audio.play_at(
-                Sound::Boost,
-                self.listener,
-                self.listener,
-                0.8,
-            ),
+            SimEvent::Jump { .. } => {
+                self.audio
+                    .play_at(Sound::Boost, self.listener, self.listener, 0.8)
+            }
             SimEvent::QuickBoost { .. } => {
                 self.audio
                     .play_at(Sound::Boost, self.listener, self.listener, 1.0)
@@ -218,8 +216,8 @@ pub struct AshframeGame {
     focus: bool,
     /// Whether the window has ever held focus. See `physics_process`.
     ever_focused: bool,
-    /// The movement axes of the most recent step, for the diagnostic line.
-    last_move: (f32, f32),
+    /// Whether to print a state trace every second, for the capture harness.
+    trace: bool,
     /// Whether to hold a fixed three-quarter view of the player.
     debug_cam: bool,
     /// Whether to drive a canned demonstration instead of reading the keyboard.
@@ -264,7 +262,7 @@ impl INode3D for AshframeGame {
             gait: 0.0,
             focus: true,
             ever_focused: false,
-            last_move: (0.0, 0.0),
+            trace: false,
             debug_cam: false,
             autoplay: false,
             frames: 0,
@@ -319,7 +317,10 @@ impl INode3D for AshframeGame {
                 Phase::Results => self.restart(),
                 _ => {}
             },
-            Some(k) if k == keys::RELOAD && (self.phase == Phase::Results || self.phase == Phase::Paused) => {
+            Some(k)
+                if k == keys::RELOAD
+                    && (self.phase == Phase::Results || self.phase == Phase::Paused) =>
+            {
                 self.restart()
             }
             _ => {}
@@ -383,14 +384,17 @@ impl INode3D for AshframeGame {
             }
         }
         self.frames += 1;
-        if self.shot_path.is_some() && self.frames.is_multiple_of(60) {
+        // A trace, for the capture harness. A screenshot says what the frame
+        // looked like; this says what the simulation was doing at the time,
+        // which is the difference between "the camera is wrong" and "the mech
+        // is somewhere unexpected".
+        if self.trace && self.frames.is_multiple_of(60) {
             let p = &self.sim.player;
             godot::global::godot_print!(
-                "f{} pos=({:.2},{:.2},{:.2}) vel=({:.2},{:.2},{:.2}) lean=({:.3},{:.3}) grounded={} speed={:.2} move=({:.2},{:.2})",
+                "f{} pos=({:.2},{:.2},{:.2}) vel=({:.2},{:.2},{:.2}) lean=({:.3},{:.3}) grounded={} speed={:.2}",
                 self.frames, p.pos.x, p.pos.y, p.pos.z,
                 p.vel.x, p.vel.y, p.vel.z, p.lean_x, p.lean_z,
-                p.grounded, p.speed(),
-                self.last_move.0, self.last_move.1
+                p.grounded, p.speed()
             );
         }
         if let Some(path) = self.shot_path.clone() {
@@ -791,7 +795,11 @@ impl AshframeGame {
         // time, so a mech standing still does not march on the spot and a fast
         // one does not glide.
         let speed = self.sim.player.speed();
-        let rate = if self.sim.player.grounded { speed * 0.22 } else { 0.0 };
+        let rate = if self.sim.player.grounded {
+            speed * 0.22
+        } else {
+            0.0
+        };
         self.gait = (self.gait + rate * dt) % (std::f32::consts::PI * 2.0);
 
         if self.sim.mission.finished() {
@@ -816,7 +824,6 @@ impl AshframeGame {
 
     fn control_state(&mut self) -> ControlState {
         let mut c = input::sample();
-        self.last_move = (c.move_x, c.move_z);
         c.jump_pressed = self.pending_jump;
         c.quick_boost_pressed = self.pending_boost;
         c.missile_pressed = self.pending_missile;
@@ -852,9 +859,7 @@ impl AshframeGame {
         }
         c.move_z = if t < 7.0 { 1.0 } else { 0.0 };
         c.move_x = if t < 7.0 { 0.0 } else { (t * 0.8).sin() };
-        c.move_mag = (c.move_x * c.move_x + c.move_z * c.move_z)
-            .sqrt()
-            .min(1.0);
+        c.move_mag = (c.move_x * c.move_x + c.move_z * c.move_z).sqrt().min(1.0);
         c.fire_primary = t > 6.0;
         c.toggle_lock_pressed = (t - 5.6).abs() < 0.01;
         c.missile_pressed = (t - 6.2).abs() < 0.01;
@@ -1106,7 +1111,10 @@ impl AshframeGame {
         let mut sun = DirectionalLight3D::new_alloc();
         sun.set_rotation(Vector3::new(-0.95, 0.65, 0.0));
         sun.set("light_energy", &1.05f32.to_variant());
-        sun.set("light_color", &Color::from_rgba(1.0, 0.93, 0.80, 1.0).to_variant());
+        sun.set(
+            "light_color",
+            &Color::from_rgba(1.0, 0.93, 0.80, 1.0).to_variant(),
+        );
         sun.set("shadow_enabled", &true.to_variant());
         sun.set("directional_shadow_max_distance", &240.0f32.to_variant());
         this.add_child(&sun);
@@ -1114,7 +1122,10 @@ impl AshframeGame {
         let mut fill = DirectionalLight3D::new_alloc();
         fill.set_rotation(Vector3::new(-0.35, -2.2, 0.0));
         fill.set("light_energy", &0.22f32.to_variant());
-        fill.set("light_color", &Color::from_rgba(0.48, 0.62, 0.86, 1.0).to_variant());
+        fill.set(
+            "light_color",
+            &Color::from_rgba(0.48, 0.62, 0.86, 1.0).to_variant(),
+        );
         fill.set("shadow_enabled", &false.to_variant());
         this.add_child(&fill);
 
@@ -1166,9 +1177,8 @@ impl AshframeGame {
                     self.autoplay = true;
                     i += 1;
                 }
-                "--ignore-focus" => {
-                    self.ever_focused = false;
-                    self.focus = true;
+                "--trace" => {
+                    self.trace = true;
                     i += 1;
                 }
                 _ => i += 1,

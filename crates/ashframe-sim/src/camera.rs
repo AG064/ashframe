@@ -440,7 +440,11 @@ mod tests {
             && pose.position.z < 1.0
             && pose.position.x.abs() < 20.0
             && pose.position.y < 7.0;
-        assert!(!inside, "the camera is inside the block: {:?}", pose.position);
+        assert!(
+            !inside,
+            "the camera is inside the block: {:?}",
+            pose.position
+        );
     }
 
     #[test]

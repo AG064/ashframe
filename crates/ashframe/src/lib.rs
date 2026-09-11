@@ -23,7 +23,13 @@ pub use game::AshframeGame;
 
 struct AshframeExtension;
 
-#[gdextension]
+// The entry symbol is named rather than left at gdext's default, because this
+// project loads two libraries: the engine's and this one. Both would otherwise
+// export `gdext_rust_init`, and Godot starts a library by looking that symbol
+// up by name — a collision there does not fail loudly, it leaves the scene's
+// `AshframeGame` node as a plain `Node` and every script that talks to it
+// failing on the first frame with "nonexistent function".
+#[gdextension(entry_symbol = ashframe_init)]
 unsafe impl ExtensionLibrary for AshframeExtension {
     fn min_level() -> InitLevel {
         InitLevel::Scene

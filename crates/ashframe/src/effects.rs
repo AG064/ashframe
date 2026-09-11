@@ -106,7 +106,10 @@ impl Effects {
         // and identical for every one of them.
         flash.set("omni_range", &30.0f32.to_variant());
         flash.set("light_energy", &0.0f32.to_variant());
-        flash.set("light_color", &Color::from_rgba(1.0, 0.85, 0.6, 1.0).to_variant());
+        flash.set(
+            "light_color",
+            &Color::from_rgba(1.0, 0.85, 0.6, 1.0).to_variant(),
+        );
         root.add_child(&flash);
 
         Self {
@@ -161,7 +164,8 @@ impl Effects {
     /// A warning ring on the ground, before a telegraphed attack lands.
     pub fn telegraph(&mut self, at: Vec3, radius: f32, duration: f32) {
         if let Some(mut node) = take(&mut self.markers) {
-            node.node.set_position(Vector3::new(at.x, at.y + 0.06, at.z));
+            node.node
+                .set_position(Vector3::new(at.x, at.y + 0.06, at.z));
             node.node.set_rotation(Vector3::new(0.0, 0.0, 0.0));
             node.fire(duration, Vector3::new(radius * 2.0, 1.0, radius * 2.0));
             self.markers.push(node);

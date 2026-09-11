@@ -199,8 +199,7 @@ impl Audio {
         // as a mixing mistake.
         let pitch = 0.72 + norm * 0.5 + if boosting { 0.22 } else { 0.0 };
         self.engine.set_pitch_scale(pitch);
-        self.engine
-            .set_volume_db(linear_to_db(0.35 + norm * 0.4));
+        self.engine.set_volume_db(linear_to_db(0.35 + norm * 0.4));
         self.thruster.set_pitch_scale(0.85 + thrust * 0.6);
         self.thruster.set_volume_db(linear_to_db(thrust * 0.6));
     }
@@ -280,7 +279,11 @@ fn render_all() -> Streams {
         // A shot: a bright burst swept down, over a short square thump.
         fire_rifle: stream({
             let mut mix = synth::noise_burst(0.11, 0.34, 2600.0, 320.0, Shape::Band, 1.4);
-            mix.mix_at(&synth::tone(Wave::Square, 180.0, 60.0, 0.07, 0.16), 0.0, 1.0);
+            mix.mix_at(
+                &synth::tone(Wave::Square, 180.0, 60.0, 0.07, 0.16),
+                0.0,
+                1.0,
+            );
             mix
         }),
         enemy_fire: stream({
@@ -366,7 +369,14 @@ fn render_all() -> Streams {
             mix
         }),
         energy_warning: stream(synth::tone(Wave::Square, 720.0, 480.0, 0.16, 0.1)),
-        boost: stream(synth::noise_burst(0.3, 0.2, 700.0, 2800.0, Shape::Band, 0.9)),
+        boost: stream(synth::noise_burst(
+            0.3,
+            0.2,
+            700.0,
+            2800.0,
+            Shape::Band,
+            0.9,
+        )),
         landing: stream({
             let mut mix = synth::tone(Wave::Sine, 120.0, 40.0, 0.28, 0.3);
             mix.mix_at(

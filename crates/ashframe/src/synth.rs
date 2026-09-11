@@ -43,7 +43,6 @@ impl Buffer {
         self.samples.len()
     }
 
-
     /// Mix another buffer in, starting at `delay` seconds.
     pub fn mix_at(&mut self, other: &Buffer, delay: f32, gain: f32) {
         let offset = (delay * SAMPLE_RATE as f32).round() as usize;
@@ -63,10 +62,7 @@ impl Buffer {
     /// normalised — which is also what stops a loud sound from being audibly
     /// crushed by the limiter in the mixer.
     pub fn normalise(&mut self, peak: f32) {
-        let loudest = self
-            .samples
-            .iter()
-            .fold(0.0f32, |acc, s| acc.max(s.abs()));
+        let loudest = self.samples.iter().fold(0.0f32, |acc, s| acc.max(s.abs()));
         if loudest <= peak || loudest <= f32::EPSILON {
             return;
         }
@@ -194,9 +190,7 @@ impl Default for Noise {
 
 impl Noise {
     pub fn new(seed: u32) -> Self {
-        Self {
-            state: seed | 1,
-        }
+        Self { state: seed | 1 }
     }
 
     /// White noise in -1..1.
@@ -246,13 +240,7 @@ pub fn noise_burst(
 }
 
 /// A tone sweeping from `from_hz` to `to_hz` with a fast attack and decay.
-pub fn tone(
-    wave: Wave,
-    from_hz: f32,
-    to_hz: f32,
-    duration: f32,
-    gain: f32,
-) -> Buffer {
+pub fn tone(wave: Wave, from_hz: f32, to_hz: f32, duration: f32, gain: f32) -> Buffer {
     let len = (duration * SAMPLE_RATE as f32).ceil() as usize;
     let mut out = Buffer {
         samples: Vec::with_capacity(len),
@@ -351,7 +339,11 @@ mod tests {
     fn nothing_clips_after_normalising() {
         let mut mix = Buffer::silence(0.3);
         mix.mix_at(&tone(Wave::Saw, 200.0, 60.0, 0.3, 0.8), 0.0, 1.0);
-        mix.mix_at(&noise_burst(0.3, 0.9, 2000.0, 200.0, Shape::Low, 0.8), 0.0, 1.0);
+        mix.mix_at(
+            &noise_burst(0.3, 0.9, 2000.0, 200.0, Shape::Low, 0.8),
+            0.0,
+            1.0,
+        );
         mix.normalise(0.9);
         let peak = mix.samples.iter().fold(0.0f32, |a, s| a.max(s.abs()));
         assert!(peak <= 0.9 + 1e-4, "peak {peak}");
