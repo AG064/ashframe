@@ -494,10 +494,6 @@ pub enum SimEvent {
     OutOfBounds {
         at: Vec3,
     },
-    Hint {
-        id: String,
-        text: String,
-    },
     Objective {
         text: String,
     },
@@ -544,7 +540,6 @@ impl SimEvent {
             Self::EnemyFire { .. } => "enemy-fire",
             Self::Telegraph { .. } => "telegraph",
             Self::OutOfBounds { .. } => "out-of-bounds",
-            Self::Hint { .. } => "hint",
             Self::Objective { .. } => "objective",
             Self::MissionComplete { .. } => "mission-complete",
             Self::MissionFailed => "mission-failed",

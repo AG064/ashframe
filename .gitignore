@@ -1,3 +1,13 @@
 target/
 .godot/
 *.tmp
+
+# The compiled GDExtension and Godot's import cache are build outputs, not
+# sources. urum build produces the library and Godot regenerates the rest.
+godot/addons/aurum/bin/*.dll
+godot/addons/aurum/bin/*.so
+godot/addons/aurum/bin/*.dylib
+godot/addons/aurum_editor/bin/*.dll
+
+# Screenshots from the capture harness.
+shots/

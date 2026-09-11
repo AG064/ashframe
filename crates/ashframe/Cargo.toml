@@ -4,9 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+# `cdylib` is what Godot loads. `lib` is here so the pure helpers — the
+# palette, the input axes, the blade curve — can be unit tested without a
+# running engine, which is most of what is worth testing in a renderer.
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
+ashframe-sim = { path = "../ashframe-sim" }
 # The engine checkout named in aurum.toml supplies Godot's
 # Rust bindings, so a project does not carry its own copy.
 godot = { git = "https://github.com/godot-rust/gdext", branch = "master", features = ["api-4-7"] }

@@ -62,6 +62,12 @@ pub struct Assist {
     pub pitch: f32,
 }
 
+/// How close the camera may be pulled when something is in the way, in metres.
+///
+/// Close enough that the mech fills the frame, which is unpleasant; far enough
+/// that the near plane does not end up inside its own torso, which is worse.
+const CLOSEST_TO_MECH: f32 = 0.9;
+
 /// The camera itself.
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -214,12 +220,28 @@ impl Camera {
         // pull in to just short of whatever it meets. Backing off by more than
         // the probe radius is what stops the near plane clipping into the wall
         // the camera is now sitting against.
+        //
+        // When something is in the way the camera is allowed to come right up
+        // to the mech, down to [`CLOSEST_TO_MECH`]. An earlier version clamped
+        // the pulled-in distance to `MIN_DISTANCE` instead, which reads as
+        // sensible until there is a wall two metres behind the player: the
+        // clamp then overrides the wall and parks the camera inside it, and the
+        // screen goes black. Coming too close fills the screen with the mech;
+        // coming too far buries it in geometry, and only one of those is
+        // recoverable by the player.
         let offset = desired - self.pivot;
         let len = offset.length();
         let mut position = if len > 1e-4 {
             let direction = offset * (1.0 / len);
             let place = match world.sweep_sphere(self.pivot, direction, cfg::PROBE_RADIUS, len) {
-                Some(hit) => (hit.t - 0.35).max(cfg::MIN_DISTANCE),
+                // Back off by the probe radius, but never closer than
+                // `CLOSEST_TO_MECH`. A player standing within the probe radius
+                // of a wall gets a hit at zero — the swept sphere is *already*
+                // overlapping — and honouring that literally puts the camera
+                // inside the mech's own chest, filling the screen with its
+                // armour. The resolve pass below is what keeps the camera out
+                // of the wall in that case.
+                Some(hit) => (hit.t - 0.35).max(CLOSEST_TO_MECH.min(len)),
                 None => distance,
             };
             self.pivot + offset * (place / len)
@@ -232,6 +254,13 @@ impl Camera {
         if position.y < ground + 1.1 {
             position.y = ground + 1.1;
         }
+
+        // Backstop. The sweep is one segment from the pivot, so anything the
+        // pivot itself is already inside — a prop the player is standing in, a
+        // wall the pull-in overshot — is invisible to it. Resolving the camera
+        // out of the world costs one pass over the boxes and turns "the screen
+        // is black" into "the camera is outside the wall".
+        world.resolve_cylinder(&mut position, 0.35, 0.35, 0.0, 0.0);
 
         self.shake_time += dt;
         self.shake = (self.shake - cfg::SHAKE_DECAY * dt * self.shake - dt * 0.6).max(0.0);
@@ -364,17 +393,54 @@ mod tests {
     }
 
     #[test]
-    fn a_pull_in_is_bounded_by_the_minimum_distance() {
+    fn a_close_wall_pulls_the_camera_in_rather_than_pushing_it_through() {
+        // The bug this pins: clamping the pulled-in distance to `MIN_DISTANCE`
+        // overrides the wall when the wall is nearer than that, and the camera
+        // ends up inside it. The screen goes black and the player has no idea
+        // why.
         let mut world = flat();
-        // A wall slamming right up against the pivot.
-        world.add(Solid::from_size(0.0, 3.0, -0.5, 20.0, 6.0, 1.0, "wall"));
+        world.add(Solid::from_size(0.0, 3.0, -2.0, 20.0, 6.0, 0.6, "wall"));
         let mut camera = Camera::new();
         let pose = settle(&mut camera, &world, target(Vec3::new(0.0, 0.0, 0.0)));
+
+        // The wall occupies z from -2.3 to -1.7. The camera must be in front of
+        // it, not behind or inside.
+        assert!(
+            pose.position.z > -1.7,
+            "the camera is inside the wall: {:?}",
+            pose.position
+        );
         let distance = (pose.position - Vec3::new(0.0, 3.72, 0.0)).length();
         assert!(
-            distance >= cfg::MIN_DISTANCE - 1e-3,
+            distance >= CLOSEST_TO_MECH - 1e-3,
             "the camera collapsed onto the mech: {distance}"
         );
+    }
+
+    #[test]
+    fn a_camera_the_sweep_cannot_see_is_pushed_out_of_the_world() {
+        // The sweep is one segment from the pivot, so a prop the pivot is
+        // already inside is invisible to it. The resolve pass is the backstop.
+        let mut world = flat();
+        world.add(Solid::from_size(0.0, 3.0, -3.0, 40.0, 8.0, 8.0, "block"));
+        let mut camera = Camera::new();
+        let mut pose = CameraPose::default();
+        for _ in 0..240 {
+            pose = camera.update(
+                1.0 / 60.0,
+                target(Vec3::new(0.0, 0.0, -3.0)),
+                &world,
+                false,
+                Assist::default(),
+            );
+        }
+        // Whatever it does, the camera is not left inside the block, which
+        // spans z from -7 to +1 and x from -20 to 20.
+        let inside = pose.position.z > -7.0
+            && pose.position.z < 1.0
+            && pose.position.x.abs() < 20.0
+            && pose.position.y < 7.0;
+        assert!(!inside, "the camera is inside the block: {:?}", pose.position);
     }
 
     #[test]
