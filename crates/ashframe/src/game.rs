@@ -72,7 +72,7 @@ impl Hooks for Sink<'_> {
                 self.effects.tracer(*origin, *direction);
                 self.effects.muzzle_flash(*origin, 1.0);
                 self.audio
-                    .play_at(Sound::FireRifle, *origin, self.listener, 1.0);
+                    .play_at(Sound::Autocannon, *origin, self.listener, 1.0);
             }
             SimEvent::EnemyFire { at } => {
                 self.effects.muzzle_flash(*at, 0.7);
@@ -799,6 +799,7 @@ impl AshframeGame {
                 self.sim.player.speed(),
                 thrust_level(&self.sim.player),
                 self.sim.player.assaulting,
+                self.sim.player.grounded,
             );
         }
 
