@@ -15,11 +15,13 @@ use ashframe_sim::arena::{Arena, Prop};
 use crate::palette::{
     box_node, from_hex, grid_material, ground_plane, material, surface_color, to_godot,
 };
+use crate::rig::{child_named, load_prop};
 
 /// The built arena, kept so it can be cleared and rebuilt on a restart.
 pub struct ArenaView {
     solids: Gd<Node3D>,
     markings: Gd<Node3D>,
+    landmarks: Gd<Node3D>,
 }
 
 impl ArenaView {
@@ -87,14 +89,84 @@ impl ArenaView {
             add_prop(&mut markings, prop, &mat);
         }
 
+        let landmarks = place_landmarks(&mut root, arena);
+
         parent.add_child(&root);
-        Self { solids, markings }
+        Self {
+            solids,
+            markings,
+            landmarks,
+        }
     }
 
     /// How many boxes the yard is drawn from, for the diagnostics overlay.
     pub fn solid_count(&self) -> usize {
         self.solids.get_child_count() as usize + self.markings.get_child_count() as usize
     }
+
+    /// How many modelled landmarks were placed.
+    pub fn landmark_count(&self) -> usize {
+        self.landmarks.get_child_count() as usize
+    }
+}
+
+/// Put the modelled props on the landmarks the arena already marks out.
+///
+/// The boxes stay where they are: they are what the simulation collides
+/// against, and they are what the renderer drew before there were models. These
+/// are added on top, at the same places, so the yard has things in it worth
+/// looking at and navigating by without a single collider changing.
+///
+/// The models are alternated rather than chosen per landmark because the arena
+/// does not say what a landmark *is* — it says where one is. Guessing from
+/// position would be worse than taking them in turn.
+fn place_landmarks(root: &mut Gd<Node3D>, arena: &Arena) -> Gd<Node3D> {
+    const MODELS: [&str; 5] = [
+        "prop_container",
+        "prop_crates",
+        "prop_tank",
+        "prop_barrier",
+        "prop_pipes",
+    ];
+
+    let mut placed = Node3D::new_alloc();
+    placed.set_name("Landmarks");
+    root.add_child(&placed);
+
+    let mut template = match load_prop(
+        &mut placed,
+        "res://models/arena_props.glb",
+        "LandmarkTemplate",
+    ) {
+        Some(node) => node,
+        None => {
+            // A missing model is a warning and an empty layer, not a failure:
+            // the yard still draws out of its boxes.
+            return placed;
+        }
+    };
+    template.set_visible(false);
+
+    for (index, at) in arena.landmarks.iter().enumerate() {
+        let Some(child) = child_named(&template, MODELS[index % MODELS.len()]) else {
+            continue;
+        };
+        let Some(copy) = child.duplicate_node().try_cast::<Node3D>().ok() else {
+            continue;
+        };
+        let mut copy = copy;
+        copy.set_visible(true);
+        copy.set_position(to_godot(*at));
+        // A little variety in facing. A row of props all pointing the same way
+        // reads as a tiling error rather than as a yard.
+        copy.set_rotation(Vector3::new(
+            0.0,
+            (index as f32 * 1.7) % std::f32::consts::TAU,
+            0.0,
+        ));
+        placed.add_child(&copy);
+    }
+    placed
 }
 
 fn add_prop(parent: &mut Gd<Node3D>, prop: &Prop, mat: &Gd<StandardMaterial3D>) {

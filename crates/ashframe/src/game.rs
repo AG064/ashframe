@@ -737,6 +737,12 @@ impl AshframeGame {
         self.arena.as_ref().map(|a| a.solid_count()).unwrap_or(0) as i32
     }
 
+    /// How many modelled landmarks were placed in the yard.
+    #[func]
+    fn landmark_count(&self) -> i32 {
+        self.arena.as_ref().map(|a| a.landmark_count()).unwrap_or(0) as i32
+    }
+
     #[func]
     fn control_help(&self) -> GString {
         GString::from(
@@ -1030,7 +1036,11 @@ impl AshframeGame {
             let pose = enemy_pose(enemy);
             let alive = enemy.alive;
             if let Some(&rig_index) = self.enemy_rigs.get(i) {
-                if let Some(rig) = self.rigs.get_mut(rig_index) {
+                if let Some(rig) = self
+                    .rigs
+                    .get_mut(rig_index)
+                    .filter(|_| rig_index != usize::MAX)
+                {
                     rig.set_visible(alive);
                     if alive {
                         rig.pose(&pose);
@@ -1050,10 +1060,18 @@ impl AshframeGame {
             let index = self.enemy_rigs.len();
             let kind = self.sim.roster.list[index].kind;
             let mut parent = self.base().clone().upcast::<Node3D>();
-            let rig_index = self.rigs.len();
-            self.rigs
-                .push(MechRig::new(&mut parent, Frame::Hostile(kind)));
-            self.enemy_rigs.push(rig_index);
+            // A model that failed to load is skipped rather than pushed as a
+            // gap, so the indices stay honest: `enemy_rigs` maps a roster slot
+            // to the rig drawing it, and a hole in it would put the wrong mech
+            // on the wrong unit.
+            if let Some(rig) = MechRig::new(&mut parent, Frame::Hostile(kind)) {
+                let rig_index = self.rigs.len();
+                self.rigs.push(rig);
+                self.enemy_rigs.push(rig_index);
+            } else {
+                self.enemy_rigs.push(usize::MAX);
+                godot::global::godot_error!("no model for {kind:?}");
+            }
         }
     }
 
@@ -1081,7 +1099,11 @@ impl AshframeGame {
         }
         self.enemy_rigs.clear();
         let mut parent = self.base().clone().upcast::<Node3D>();
-        self.rigs.push(MechRig::new(&mut parent, Frame::Player));
+        if let Some(rig) = MechRig::new(&mut parent, Frame::Player) {
+            self.rigs.push(rig);
+        } else {
+            godot::global::godot_error!("the player mech model did not load");
+        }
     }
 
     fn build_world(&mut self) {
