@@ -108,13 +108,26 @@ if ($Release) {
 Write-Step 'importing the Godot project'
 $import = Find-GodotForImport
 $project = Join-Path $root 'godot'
-# The import itself succeeds; the editor process then crashes on the way out,
-# inside the engine's own editor plug-in, which is why this checks what the
-# import produced rather than what it exited with. The crash is reproducible
-# with the Ashframe extension removed, so it is not this project's.
-& $import --headless --path $project --import 2>&1 |
-    Where-Object { $_ -match 'Parse Error|Cannot get class' } |
-    Select-Object -First 20
+
+# Twice, and the second run is the one that counts.
+#
+# Godot 4.7 exits with an access violation at the end of the *first* headless
+# import of any project that loads a GDExtension -- after the import has
+# finished and the editor settings have been saved, so the work is done and
+# only the shutdown is broken. It is not our extension: it reproduces with a
+# fifteen-line GDExtension that registers a single empty Node class, and it
+# does not happen on a second import or in a windowed one.
+#
+# Running it again is not a workaround for a broken import; the second run is a
+# no-op that exits cleanly, which is what lets this script and a CI job read
+# the exit code instead of parsing for errors.
+$first = & $import --headless --path $project --import 2>&1
+$first | Where-Object { $_ -match 'Parse Error|Cannot get class|ERROR: Failed' } | Select-Object -First 20
+$second = & $import --headless --path $project --import 2>&1
+$second | Where-Object { $_ -match 'Parse Error|Cannot get class|ERROR: Failed' } | Select-Object -First 20
+if ($LASTEXITCODE -ne 0) {
+    throw "Godot could not import the project (exit $LASTEXITCODE)"
+}
 
 $list = Join-Path $project '.godot/extension_list.cfg'
 if (-not (Test-Path $list)) {

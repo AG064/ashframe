@@ -611,7 +611,13 @@ impl Simulation {
         let (x, z) = self
             .collision
             .nearest_ground(self.player.pos.x, self.player.pos.z, 6.0, 8);
-        let y = self.collision.ground_at(x, z, 200.0, 0.0) + 0.5;
+        // A real probe, not a zero-length one. It was `0.0`, which is a ray of
+        // no length: it never hit anything, so this always answered with the
+        // world floor and dropped a mech that fell off an elevated deck down to
+        // the ground *underneath* the deck, inside whatever was there. The
+        // resolver pushed it out on the next step, so it looked like nothing
+        // worse than a bad landing, which is exactly why it survived.
+        let y = self.collision.ground_at(x, z, 200.0, 400.0) + 0.5;
         self.player.pos = Vec3::new(x, y, z);
         self.player.vel = Vec3::ZERO;
         app.emit(&SimEvent::OutOfBounds {

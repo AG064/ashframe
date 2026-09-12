@@ -673,9 +673,7 @@ impl Player {
                 &mut self.pos,
                 self.radius,
                 self.height,
-                // A generous step height, so kerbs and ramp steps are walked
-                // over rather than caught on.
-                1.25,
+                cfg::STEP_HEIGHT,
                 self.vel.y,
             );
 
@@ -698,16 +696,33 @@ impl Player {
         // Vertical, resolved once: there is no equivalent tunnelling risk
         // straight up or down.
         self.pos.y += self.vel.y * dt;
-        let resolved =
-            world.resolve_cylinder(&mut self.pos, self.radius, self.height, 1.25, self.vel.y);
+        let resolved = world.resolve_cylinder(
+            &mut self.pos,
+            self.radius,
+            self.height,
+            cfg::STEP_HEIGHT,
+            self.vel.y,
+        );
         if resolved.ceiling && self.vel.y > 0.0 {
             self.vel.y = 0.0;
         }
 
+        // The probe starts a step above the feet, and no higher.
+        //
+        // It used to start above the mech's head, so that a body falling fast
+        // could not pass through a surface between two frames. The cost was
+        // that it also saw anything the mech was standing *under*, and the
+        // result is assigned to the feet unconditionally — so a deck two metres
+        // over the mech's head became the floor, and walking beneath a gantry
+        // teleported the mech onto the roof of it.
+        //
+        // A step above the feet is still enough to stop tunnelling: the fastest
+        // a mech falls is well under a step per frame, so a surface it has just
+        // sunk past is still above the start of the cast and is still found.
         let ground = world.ground_under(
             self.pos.x,
             self.pos.z,
-            self.pos.y + self.height + 2.0,
+            self.pos.y + cfg::STEP_HEIGHT,
             self.radius,
         );
 
@@ -1232,6 +1247,70 @@ mod tests {
     }
 
     // -- jumping ----------------------------------------------------------
+
+    #[test]
+    fn a_mech_under_an_overhang_stays_on_the_floor() {
+        // The ground probe casts down from above the mech's head so that a body
+        // falling fast cannot pass through a surface between frames. The cost
+        // of starting the cast up there is that it sees anything the mech is
+        // standing *under*, and the result is assigned to the feet
+        // unconditionally -- so a deck two metres above the head becomes the
+        // floor and the mech is teleported onto the roof of the thing it walked
+        // beneath.
+        let mut world = world();
+        world.add_centred(
+            Vec3::new(0.0, 7.5, 10.0),
+            Vec3::new(20.0, 0.25, 20.0),
+            "deck",
+        );
+
+        let mut p = player();
+        let mut log = EventLog::new();
+        let dt = crate::config::sim::DT;
+        // Walk in under the deck and stand there.
+        for _ in 0..120 {
+            p.step(dt, &forward(), &Triggers::default(), None, &world, &mut log);
+        }
+
+        assert!(
+            p.pos.y < 1.0,
+            "the mech climbed onto the deck it walked under: y = {}",
+            p.pos.y
+        );
+    }
+
+    #[test]
+    fn walking_into_a_kerb_steps_onto_it() {
+        // The other half of the same rule: a surface within a step of the feet
+        // *is* something to stand on, and the mech should end up on top of it
+        // rather than stopped against it.
+        let mut world = world();
+        // Long enough that the mech is still on it when the walking stops. A
+        // short kerb is a test of whether the mech can walk off the far end.
+        world.add_centred(
+            Vec3::new(0.0, 0.4, 40.0),
+            Vec3::new(20.0, 0.4, 38.0),
+            "kerb",
+        );
+
+        let mut p = player();
+        let mut log = EventLog::new();
+        let dt = crate::config::sim::DT;
+        for _ in 0..90 {
+            p.step(dt, &forward(), &Triggers::default(), None, &world, &mut log);
+        }
+
+        assert!(
+            p.pos.z > 4.0,
+            "the mech never reached the kerb: z = {}",
+            p.pos.z
+        );
+        assert!(
+            (p.pos.y - 0.8).abs() < 0.05,
+            "the mech should be standing on the kerb: y = {}",
+            p.pos.y
+        );
+    }
 
     #[test]
     fn a_jump_leaves_the_ground_and_lands_again() {

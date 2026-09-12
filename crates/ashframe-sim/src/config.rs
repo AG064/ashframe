@@ -41,6 +41,13 @@ pub mod world {
     pub const GRAVITY: f32 = -26.0;
     /// Fixed arena floor height.
     pub const FLOOR_Y: f32 = 0.0;
+    /// How tall a ledge a hostile will walk over rather than into.
+    ///
+    /// Shared between the collision resolver, which ignores anything below it,
+    /// and the ground probe, which is what actually places the unit on top.
+    /// They have to agree: the resolver deliberately declines to block a low
+    /// ledge, so if the probe cannot see it the unit walks through it instead.
+    pub const ENEMY_STEP_HEIGHT: f32 = 1.0;
 }
 
 /// The player's frame.
@@ -75,6 +82,15 @@ pub mod player {
     pub const INPUT_BUFFER: f32 = 0.15;
     /// Grace after leaving an edge during which a jump still works.
     pub const COYOTE_TIME: f32 = 0.12;
+    /// How tall a ledge the mech walks over rather than into.
+    ///
+    /// A generous figure, so kerbs and ramp steps are walked over rather than
+    /// caught on. It is also the height from which the ground probe looks for a
+    /// surface: the probe has to start above the feet by at least a step, or a
+    /// ledge the mech is walking onto would be invisible to it, and by no more
+    /// than a step, or anything the mech is standing *under* would be mistaken
+    /// for the floor.
+    pub const STEP_HEIGHT: f32 = 1.25;
 
     pub const ASSAULT_SPEED: f32 = 40.0;
     pub const ASSAULT_ACCEL: f32 = 90.0;

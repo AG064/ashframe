@@ -478,7 +478,7 @@ impl Enemy {
                 &mut self.pos,
                 self.radius,
                 self.height,
-                1.0,
+                world_cfg::ENEMY_STEP_HEIGHT,
                 self.vel.y,
             );
             let normal = resolved.normal_xz.horizontal_normalized();
@@ -492,12 +492,19 @@ impl Enemy {
         }
 
         // Gravity and a ground snap: mobile units never float.
+        //
+        // The probe starts one step above the feet rather than above the head,
+        // for the same reason the player's does: a cast that begins above the
+        // unit sees whatever the unit is standing under, and assigning that to
+        // the feet lifts it onto the roof of a structure it was walking
+        // beneath. One step is still more than a unit falls in a frame, so a
+        // surface it has just sunk past is still found.
         self.vel.y += world_cfg::GRAVITY * dt;
         self.pos.y += self.vel.y * dt;
         let ground = ctx.world.ground_at(
             self.pos.x,
             self.pos.z,
-            self.pos.y + self.height + 2.0,
+            self.pos.y + world_cfg::ENEMY_STEP_HEIGHT,
             220.0,
         );
         if self.pos.y <= ground {
@@ -992,6 +999,30 @@ mod tests {
             enemy.step(dt, &mut ctx);
         }
         log
+    }
+
+    #[test]
+    fn a_unit_under_an_overhang_stays_on_the_floor() {
+        // The player's ground probe had this bug and the units' probe had the
+        // same one: it cast downward from above the head, saw whatever the unit
+        // was standing under, and assigned that to the feet. A skirmisher
+        // walking beneath a gantry ended up on the gantry.
+        let mut collision = world();
+        // Just above a skirmisher's head and below the top of the old probe.
+        // A deck higher than the probe start was never found and a deck below
+        // the head was never a bug, so the band that matters is narrow and this
+        // has to sit inside it.
+        collision.add_centred(Vec3::new(0.0, 5.2, 0.0), Vec3::new(40.0, 0.2, 40.0), "deck");
+
+        let mut unit = Enemy::new(EnemyKind::Skirmisher);
+        unit.revive(Vec3::new(0.0, 0.0, 0.0));
+        run(&mut unit, 1.0, Vec3::new(0.0, 0.0, 20.0), &collision);
+
+        assert!(
+            unit.pos.y < 1.0,
+            "the unit climbed onto the deck it walked under: y = {}",
+            unit.pos.y
+        );
     }
 
     #[test]
