@@ -399,9 +399,7 @@ mod tests {
     #[test]
     fn fading_edges_leaves_the_middle_alone() {
         let mut buffer = Buffer::silence(0.2);
-        for s in &mut buffer.samples {
-            *s = 1.0;
-        }
+        buffer.samples.fill(1.0);
         let middle = buffer.samples[buffer.len() / 2];
         buffer.fade_edges(0.01);
         assert_eq!(buffer.samples[0], 0.0);
