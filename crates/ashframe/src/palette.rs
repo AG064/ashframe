@@ -186,17 +186,11 @@ pub fn grid_material(base: u32, metallic: f32, roughness: f32) -> Gd<StandardMat
     mat
 }
 
-/// A material that glows, for anything that should read as powered.
-pub fn glow(color: Color, energy: f32) -> Gd<StandardMaterial3D> {
-    let mut mat = StandardMaterial3D::new_gd();
-    mat.set_albedo(color);
-    mat.set_metallic(0.0);
-    mat.set_roughness(0.35);
-    mat.set("emission_enabled", &true.to_variant());
-    mat.set_emission(color);
-    mat.set_emission_energy_multiplier(energy);
-    mat
-}
+// The `glow` helper used to live here. The effects module builds its own
+// materials now -- it needs to drive emission from a vertex-colour ramp and to
+// switch emission back off on the same material, which a general-purpose
+// glowing material cannot express. Keeping a second, unused way to make
+// something glow would only be a way for the two to drift apart.
 
 /// An unlit material, for tracers and markers where shading would only blur the
 /// shape at the distance the player actually sees them.
