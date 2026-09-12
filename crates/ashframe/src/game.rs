@@ -1211,13 +1211,24 @@ impl AshframeGame {
                     self.debug_cam = true;
                     i += 1;
                 }
+                // Each of the harness flags starts the game as well as
+                // configuring it. They read as "capture the game doing
+                // something", and a flag that quietly captured the briefing
+                // instead is worse than one that does nothing: the picture
+                // looks plausible and shows none of what it was asked for.
+                //
+                // `deploy` returns early unless the game is at the briefing or
+                // the results, so naming both `--play` and `--autoplay` is
+                // harmless.
                 "--autoplay" => {
                     self.autoplay = true;
+                    self.deploy();
                     i += 1;
                 }
                 "--demo-win" => {
                     self.autoplay = true;
                     self.demo_win = true;
+                    self.deploy();
                     i += 1;
                 }
                 "--trace" => {
