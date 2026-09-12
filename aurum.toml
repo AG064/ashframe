@@ -9,4 +9,4 @@ modules = []
 [engine]
 # Where the Aurum engine checkout lives. Everything the project
 # needs from the engine is reached through this path.
-path_hint = "A:/RecoveredProjects/C_Drive/Game_Development/aurum-engine"
+path_hint = "A:/RecoveredProjects/C_Drive/Game_Development/aurum-studio"

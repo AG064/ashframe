@@ -14,11 +14,11 @@ survive a pair of siege units, and bring down the Patriarch.
 checkout.
 
 ```powershell
-git clone <this repo> ashframe
+git clone https://github.com/AG064/ashframe.git ashframe
 cd ashframe
 
 # Point the project at your engine checkout:
-#   aurum.toml -> [engine] path_hint = "A:/path/to/aurum-engine"
+#   aurum.toml -> [engine] path_hint = "A:/path/to/aurum-studio"
 
 pwsh -File scripts/setup.ps1
 pwsh -File scripts/play.ps1
