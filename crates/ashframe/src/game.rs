@@ -79,19 +79,24 @@ impl Hooks for Sink<'_> {
                 self.audio
                     .play_at(Sound::EnemyFire, *at, self.listener, 1.0);
             }
-            SimEvent::MissileLaunch { origin, .. } => {
-                self.effects.muzzle_flash(*origin, 1.4);
+            SimEvent::MissileLaunch { origin, direction } => {
+                self.effects.missile_launch(*origin, *direction);
                 self.audio
                     .play_at(Sound::MissileLaunch, *origin, self.listener, 1.0);
             }
 
             SimEvent::BladeHit { at, .. } => {
+                self.effects.blade_hit(*at);
                 self.audio.play_at(Sound::BladeHit, *at, self.listener, 1.0);
             }
             // A hard surface rings and a soft one thuds, and the simulation
             // already tags every prop with what it is made of.
-            SimEvent::Impact { at, surface, .. } => {
-                self.effects.impact(*at);
+            SimEvent::Impact {
+                at,
+                normal,
+                surface,
+            } => {
+                self.effects.impact(*at, surface, *normal);
                 let hard = matches!(
                     surface.as_str(),
                     "steel" | "plating" | "armor" | "player" | "tank" | "container" | "glass"
@@ -121,7 +126,7 @@ impl Hooks for Sink<'_> {
                 self.audio
                     .play_at(Sound::Telegraph, *at, self.listener, 1.0);
             }
-            SimEvent::Hit { at, .. } => self.effects.impact(*at),
+            SimEvent::Hit { at, .. } => self.effects.mech_hit(*at),
             // The blade is heard when it is swung rather than when it connects;
             // the windup is the phase the player is committing to.
             SimEvent::Blade {
@@ -129,11 +134,13 @@ impl Hooks for Sink<'_> {
             } => self
                 .audio
                 .play_at(Sound::BladeSwing, self.listener, self.listener, 1.0),
-            SimEvent::Jump { .. } => {
+            SimEvent::Jump { at } => {
+                self.effects.jump_dust(*at);
                 self.audio
                     .play_at(Sound::Boost, self.listener, self.listener, 0.8)
             }
-            SimEvent::QuickBoost { .. } => {
+            SimEvent::QuickBoost { at, direction } => {
+                self.effects.boost_dust(*at, *direction);
                 self.audio
                     .play_at(Sound::Boost, self.listener, self.listener, 1.0)
             }
@@ -141,7 +148,8 @@ impl Hooks for Sink<'_> {
                 self.audio
                     .play_at(Sound::Boost, self.listener, self.listener, 0.7)
             }
-            SimEvent::Land { speed, .. } => {
+            SimEvent::Land { at, speed } => {
+                self.effects.landing(*at, *speed);
                 let gain = (speed / 40.0).clamp(0.2, 1.0);
                 self.audio
                     .play_at(Sound::Landing, self.listener, self.listener, gain);
@@ -154,8 +162,12 @@ impl Hooks for Sink<'_> {
                 self.audio
                     .play_at(Sound::PlayerStagger, self.listener, self.listener, 1.0)
             }
-            SimEvent::PlayerDamage { at, .. } => self.audio.damage(*at, self.listener),
-            SimEvent::Destroy { at, .. } => {
+            SimEvent::PlayerDamage { at, .. } => {
+                self.effects.mech_hit(*at);
+                self.audio.damage(*at, self.listener)
+            }
+            SimEvent::Destroy { at, kind, .. } => {
+                self.effects.destroy(*at, kind);
                 self.audio
                     .play_at(Sound::Explosion, *at, self.listener, 1.0)
             }
