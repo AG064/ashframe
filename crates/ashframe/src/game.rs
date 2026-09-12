@@ -279,6 +279,18 @@ impl INode3D for AshframeGame {
     fn ready(&mut self) {
         self.build_world();
         self.read_command_line();
+        if self.capturing() {
+            // Godot creates the window before the game gets a say, so this is
+            // the first opportunity rather than the best one. From here on the
+            // window cannot be focused at all, and a window that cannot be
+            // focused is a window that cannot take the pointer -- which is a
+            // stronger guarantee than declining to capture it, because the
+            // click that would have activated it never reaches us either.
+            if let Some(mut window) = self.base().get_window() {
+                window.set_flag(godot::classes::window::Flags::NO_FOCUS, true);
+            }
+            Input::singleton().set_mouse_mode(godot::classes::input::MouseMode::VISIBLE);
+        }
         self.objective = GString::from(self.sim.mission.objective());
         self.place_camera_idle(0.0);
     }
@@ -754,7 +766,20 @@ impl AshframeGame {
 }
 
 impl AshframeGame {
+    /// Whether this run is taking a picture rather than being played.
+    fn capturing(&self) -> bool {
+        self.shot_path.is_some()
+    }
+
+    /// Take or release the pointer.
+    ///
+    /// A capture run never takes it. It runs on somebody's desktop while they
+    /// are working, and a game that grabs the mouse every time a frame is taken
+    /// is a game nobody runs twice.
     fn capture_mouse(&self, captured: bool) {
+        if self.capturing() {
+            return;
+        }
         let mode = if captured {
             godot::classes::input::MouseMode::CAPTURED
         } else {
